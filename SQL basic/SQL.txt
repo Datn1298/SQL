@@ -1,0 +1,374 @@
+// SQL movie-rating Query Exercises
+
+// Q1. Find the titles of all movies directed by Steven Spielberg.
+select title
+from movie
+where director = 'Steven Spielberg'
+
+// Q2. Find all years that have a movie that received a rating of 4 or 5, and sort them in increasing order.
+select distinct year
+from movie m join rating r
+on m.mid = r.mid
+where r.stars in ( 4, 5)
+order by year
+
+//Q3. Find the titles of all movies that have no ratings.
+select title
+from movie
+where mid not in (
+	select mid from rating
+)
+
+//Q4. Some reviewers didn't provide a date with their rating.
+//Find the names of all reviewers who have ratings with a null value for the date.
+select rv.name
+from reviewer rv join rating r
+on rv.rid = r.rid
+where r.ratingDate is null
+
+//Q5. Write a query to return the ratings data in a more readable format: reviewer name, movie title, stars, and ratingDate.
+//Also, sort the data, first by reviewer name, then by movie title, and lastly by number of stars.
+select name , title, stars , ratingDate
+from movie
+join rating using(mid)
+join reviewer using(rid)
+order by name, title, stars;
+
+//Q6. For all cases where the same reviewer rated the same movie twice and gave it a higher rating the second time, return the reviewer's name and the title of the movie.
+select name, title
+from reviewer rv, movie m, rating r1, rating r2
+where r1.rid = rv.rid
+and r2.rid = rv.rid
+and r1.mid = m.mid
+and r2.mid = m.mid
+and r1.stars < r2.stars
+and r1.ratingDate < r2.ratingDate
+
+//Q7. For each movie that has at least one rating, find the highest number of stars that movie received.
+//Return the movie title and number of stars. Sort by movie title.
+select title, max(stars)
+from movie
+join rating using(mid)
+group by mid
+order by title
+
+//Q8. For each movie, return the title and the 'rating spread', that is, the difference between highest and lowest ratings given to that movie.
+//Sort by rating spread from highest to lowest, then by movie title.
+select title, (max(stars) - min(stars))as rating_spread
+from movie
+join rating using(mid)
+group by mid
+order by rating_spread desc, title
+
+//Q9. Find the difference between the average rating of movies released before 1980 and the average rating of movies released after 1980.
+//(Make sure to calculate the average rating for each movie, then the average of those averages for movies before 1980 and movies after.
+//Don't just calculate the overall average rating before and after 1980.)
+select avg(Before1980.avg) - avg(After1980.avg)
+from (select avg(stars) as avg
+	 from rating
+	 join movie using(mid)
+	 where year < 1980
+	 group by mid) as Before1980,
+	 (select avg(stars) as avg
+	 from rating
+	 join movie using(mid)
+	 where year > 1980
+	 group by mid) as After1980
+
+
+//SQL movie-rating Query Exercises Extras
+
+//Q1. Find the names of all reviewers who rated Gone with the Wind.
+select distinct name
+from reviewer
+join rating using(rid)
+join movie using(mid)
+where title = 'Gone with the Wind'
+
+//Q2. For any rating where the reviewer is the same as the director of the movie, return the reviewer name, movie title, and number of stars.
+select name, title, stars 
+from reviewer
+join rating using(rid)
+join movie using(mid)
+where director = name
+
+//Q3. Return all reviewer names and movie names together in a single list, alphabetized.
+//(Sorting by the first name of the reviewer and first word in the title is fine; no need for special processing on last names or removing "The".)
+select name from reviewer
+union
+select title from movie
+
+//Q4. Find the titles of all movies not reviewed by Chris Jackson.
+select  title
+from movie
+where mid not in (
+	select mid from rating
+	join reviewer using (rid)
+	where name = 'Chris Jackson'
+)
+
+//Q5. For all pairs of reviewers such that both reviewers gave a rating to the same movie, return the names of both reviewers. Eliminate duplicates, don't pair reviewers with themselves, and include each pair only once.
+//For each pair, return the names in the pair in alphabetical order.
+select distinct rv1.name, rv2.name
+from rating r1, rating r2, reviewer rv1, reviewer rv2
+where r1.mid = r2.mid and r1.rid = rv1.rid and r2.rid = rv2.rid
+and rv1.name < rv2.name
+order by rv1.name, rv2.name;
+
+//Q6. For each rating that is the lowest (fewest stars) currently in the database, return the reviewer name, movie title, and number of stars.
+select name, title, stars 
+from reviewer
+join rating using(rid)
+join movie using(mid)
+where stars = (select min(stars) from rating)
+
+//Q7. List movie titles and average ratings, from highest-rated to lowest-rated.
+//If two or more movies have the same average rating, list them in alphabetical order.
+select title , avg(stars) as average  
+from movie
+join rating using(mid)
+group by mid
+order by average DESC, title
+
+//Q8. Find the names of all reviewers who have contributed three or more ratings.
+//(As an extra challenge, try writing the query without having or without COUNT.)
+select name 
+from reviewer
+join rating using(rid)
+group by rid
+having count(*) >= 3
+
+//Q9. Some directors directed more than one movie.
+//For all such directors, return the titles of all movies directed by them, along with the director name.
+//Sort by director name, then movie title.
+//(As an extra challenge, try writing the query both with and without COUNT.)
+select m1.title, m1.director
+from movie m1
+where (
+	select count(*)
+	from movie m2
+	where m2.director = m1.director
+) > 1
+order by m1.director, m1.title
+
+//Q10. Find the movie(s) with the highest average rating.
+//Return the movie title(s) and average rating.
+//(Hint: This query is more difficult to write in SQLite than other systems; you might think of it as finding the highest average rating and then choosing the movie(s) with that average rating.)
+select title, AVG(stars)
+from movie
+join rating using(mid)
+group by movie.mid, title
+having  AVG(stars) = (
+	select MAX(avg_stars)
+	from (
+		select title, AVG(stars) AS avg_stars
+		from movie
+		join rating USING(mid)
+		group by title
+		) AS A1
+)
+
+//Q11. Find the movie(s) with the lowest average rating.
+//Return the movie title(s) and average rating.
+//(Hint: This query may be more difficult to write in SQLite than other systems; you might think of it as finding the lowest average rating and then choosing the movie(s) with that average rating.)
+select title, AVG(stars)
+from movie
+join rating using(mid)
+group by movie.mid, title
+having  AVG(stars) = (
+	select min(avg_stars)
+	from (
+		select title, AVG(stars) AS avg_stars
+		from movie
+		join rating USING(mid)
+		group by title
+		) AS A1
+)
+
+//Q12. For each director, return the director's name together with the title(s) of the movie(s) they directed that received the highest rating among all of their movies, and the value of that rating.
+//Ignore movies whose director is null.
+select director, title, max(stars)
+from movie
+join rating using(mid)
+where director is not null
+group by director
+
+
+//SQL Social-Network Query Exercises
+
+//Q1. Find the names of all students who are friends with someone named Gabriel.
+select h1.name
+from highschooler h1
+join friend on h1.id = id1
+join highschooler h2 on id2=h2.id
+where h2.name = 'Gabriel'
+
+//Q2. For every student who likes someone 2 or more grades younger than themselves, return that student's name and grade, and the name and grade of the student they like.
+select h1.name, h1.grade, h2.name, h2.grade
+from highschooler h1
+join Likes on h1.id = id1
+join highschooler h2 on id2=h2.id
+where h1.grade - h2.grade >= 2
+
+//Q3. For every pair of students who both like each other, return the name and grade of both students.
+//Include each pair only once, with the two names in alphabetical order.
+select h1.name, h1.grade, h2.name, h2.grade
+from highschooler h1, likes l1, highschooler h2, likes l2 
+where (h1.id = l1.id1) and (l1.id2=h2.id) and (h1.id=l2.id2) and (h2.id=l2.id1) and h1.name<h2.name
+
+//Q4. Find all students who do not appear in the Likes table (as a student who likes or is liked) and return their names and grades.
+//Sort by grade, then by name within each grade.
+select name, grade
+from highschooler
+where id not in ( 
+	select id1 from likes group by id1
+	union
+	select id2 from likes group by id2
+)
+
+//Q5. For every situation where student A likes student B, but we have no information about whom B likes (that is, B does not appear as an ID1 in the Likes table), return A and B's names and grades.
+select h1.name, h1.grade, h2.name, h2.grade
+from highschooler h1, likes l, highschooler h2
+where (h1.id=l.id1 and l.id2=h2.id) and
+	h2.id not in (
+		select id1 from likes)
+
+//Q6. Find names and grades of students who only have friends in the same grade.
+//Return the result sorted by grade, then by name within each grade
+select name, grade
+from highschooler h1
+where id not in (
+	select id1
+	from Highschooler h2, friend f
+	where h2.id = f.id2 and h1.id = f.id1 and h1.grade <> h2.grade 
+)
+order by grade, name
+
+//Q7. For each student A who likes a student B where the two are not friends, find if they have a friend C in common (who can introduce them!).
+// For all such trios, return the name and grade of A, B, and C.
+select distinct a.name, a.grade, b.name, b.grade, c.name, C.grade
+from highschooler a, highschooler b, highschooler c, likes l, friend f1, friend f2
+where (a.id = l.id1 and l.id2 = b.id) 
+and b.id not in (
+	select id2 from friend
+	where id1 = a.id
+) and (a.id = f1.id1 and c.id = f1.id2) and (b.id = f2.id1 and c.id = f2.id2)
+
+//Q8. Find the difference between the number of students in the school and the number of different first names.
+select (count(*) -  count(distinct name))
+from highschooler
+
+//Q9. Find the name and grade of all students who are liked by more than one other student.
+select name, grade
+from highschooler
+join likes on id = id2
+group by id
+having count(*) > 1
+
+
+//SQL Social-Network Query Exercises Extras.
+
+//Q1. For every situation where student A likes student B, but student B likes a different student C, return the names and grades of A, B, and C.
+select a.name, a.grade, b.name, b.grade, c.name, c.grade
+from highschooler a, highschooler b, highschooler c, likes l1, likes l2
+where (a.id=l1.id1 and b.id=l1.id2) and (b.id=l2.id1 and c.id=l2.id2) and ( a.id <> c.id)
+
+//Q2. Find those students for whom all of their friends are in different grades from themselves. Return the students' names and grades.
+select h.name, h.grade
+from highschooler h
+where h.grade not in (
+	select h2.grade
+	from highschooler h2, friend f
+	where h.id=f.id1 and h2.id=f.id2
+	)
+
+//Q3. What is the average number of friends per student? (Your result should be just one number.)
+select avg(count)
+from (
+	select count(*) as count
+	from friend
+	group by id1
+	)
+
+//Q4. Find the number of students who are either friends with Cassandra or are friends of friends of Cassandra.
+// Do not count Cassandra, even though technically she is a friend of a friend.
+select count(*)
+from Friend
+where ID1 IN (
+  select ID2
+  from Friend
+  where ID1 IN (
+    select ID
+    from Highschooler
+    where name = 'Cassandra'
+  )
+);
+
+//Q5. Find the name and grade of the student(s) with the greatest number of friends.
+select hl.name, hl.grade
+from highschooler hl
+join friend f on hl.id = f.id1
+group by f.id1
+having count(*) = (
+	select max(count)
+	from (
+		select count(*) as count
+		from friend
+		group by id1
+	)
+)
+
+
+//SQL movie-rating Modification Exercises
+
+//Q1. Add the reviewer Roger Ebert to your database, with an rid of 209.
+INSERT INTO reviewer (rid , name)
+VALUES (209, 'Roger Ebert')
+
+//Q2. For all movies that have an average rating of 4 stars or higher, add 25 to the release year. (Update the existing tuples; don't insert new tuples.)
+UPDATE movie
+SET year = year + 25
+where mid IN (
+  select mid
+  from movie
+  join rating using(mid)
+  group by mid
+  having avg(stars) >= 4
+)
+
+//Q3. Remove all ratings where the movie's year is before 1970 or after 2000, and the rating is fewer than 4 stars.
+DELETE from rating
+where mid IN (
+  select mid
+  from movie
+  where year < 1970 or year > 2000
+) and stars < 4
+
+
+//SQL Social-Network Modification Exercises
+
+//Q1. It's time for the seniors to graduate. Remove all 12th graders from Highschooler.
+DELETE from Highschooler  
+where grade = 12
+
+//Q2.If two students A and B are friends, and A likes B but not vice-versa, remove the Likes tuple
+delete from likes
+where id1 in
+	(select likes.id1 
+	 from friend
+	 join likes using (id1) 
+	 where friend.id2 = likes.id2) 
+and not id2 in
+	(select likes.id1 
+     	from friend join likes using (id1) 
+     	where friend.id2 = likes.id2)
+
+//Q3. For all cases where A is friends with B, and B is friends with C, add a new friendship for the pair A and C. Do not add duplicate friendships, friendships that already exist, or friendships with oneself.
+(This one is a bit challenging; congratulations if you get it right.)
+insert into friend
+select f1.id1, f2.id2
+from friend f1
+join friend f2 on f1.id2 = f2.id1
+where f1.id1 <> f2.id2
+except
+select * from friend
